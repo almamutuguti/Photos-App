@@ -1,0 +1,54 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="mb-8">
+    <h1 class="text-3xl font-bold text-gray-800 mb-4">Discover Amazing Photos</h1>
+    
+    <!-- Tag Filters -->
+    <div class="flex flex-wrap gap-2 mb-6">
+        <a href="{% url 'home' %}" class="px-3 py-1 rounded-full {% if not selected_tag %}bg-blue-600 text-white{% else %}bg-gray-200 text-gray-700 hover:bg-gray-300{% endif %}">
+            All
+        </a>
+        {% for tag in tags %}
+            <a href="?tag={{ tag.name }}" class="px-3 py-1 rounded-full {% if selected_tag == tag.name %}bg-blue-600 text-white{% else %}bg-gray-200 text-gray-700 hover:bg-gray-300{% endif %}">
+                {{ tag.name }} ({{ tag.photo_count }})
+            </a>
+        {% endfor %}
+    </div>
+</div>
+
+<!-- Photo Grid -->
+<div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
+    {% for photo in photos %}
+        <div class="bg-white rounded-lg shadow-md overflow-hidden hover:shadow-lg transition-shadow">
+            <a href="{% url 'photo_detail' photo.pk %}">
+                <img src="{{ photo.image.url }}" alt="{{ photo.title }}" class="w-full h-48 object-cover">
+            </a>
+            <div class="p-4">
+                <h3 class="font-semibold text-lg mb-2">
+                    <a href="{% url 'photo_detail' photo.pk %}" class="text-gray-800 hover:text-blue-600">
+                        {{ photo.title }}
+                    </a>
+                </h3>
+                <p class="text-gray-600 text-sm mb-2">By {{ photo.uploaded_by.username }}</p>
+                
+                <!-- Tags -->
+                <div class="flex flex-wrap gap-1">
+                    {% for tag in photo.tags.all %}
+                        <span class="text-xs bg-gray-100 text-gray-700 px-2 py-1 rounded">
+                            {{ tag.name }}
+                        </span>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+    {% empty %}
+        <div class="col-span-full text-center py-12">
+            <p class="text-gray-500 text-lg">No photos found.</p>
+            {% if user.is_authenticated %}
+                <a href="{% url 'upload_photo' %}" class="text-blue-600 hover:underline">Upload the first photo!</a>
+            {% endif %}
+        </div>
+    {% endfor %}
+</div>
+{% endblock %}

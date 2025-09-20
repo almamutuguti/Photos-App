@@ -2,15 +2,16 @@ from django.db import models
 from django.contrib.auth.models import User
 from django.dispatch import receiver
 from django.db.models.signals import post_save
+from django.utils import timezone
 
 class Profile(models.Model):
     user = models.OneToOneField(User, on_delete=models.CASCADE)
-    bio = models.TextField(max_length=500, blank=True)
+    bio = models.TextField(max_length=500, null=True)
     profile_picture = models.ImageField(
         upload_to='profile_pictures/',
         default='profile_pictures/default.png'
     )
-    created_at = models.DateTimeField(auto_now_add=True)
+    created_at = models.DateTimeField(default=timezone.now)
     updated_at = models.DateTimeField(auto_now=True)
 
 # automatically create user profile when user is created
@@ -26,16 +27,16 @@ def save_user_profile(sender, instance, **kwargs):
 
 class Tag(models.Model):
     name = models.CharField(max_length=50, unique=True)
-    created_at = models.DateTimeField(auto_now_add=True)
+    created_at = models.DateTimeField(default=timezone.now)
 
     def __str__(self):
         return self.name
 
 class Photo(models.Model):
     title = models.CharField(max_length=200)
-    description = models.TextField(blank=True)
+    description = models.TextField(null=True)
     image = models.ImageField(upload_to='photos/')
-    tags = models.ManyToManyField(Tag, blank=True)
+    tags = models.ManyToManyField(Tag, null=True)
     uploaded_by = models.ForeignKey(User, on_delete=models.CASCADE)
     uploaded_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
@@ -51,7 +52,7 @@ class UserInteraction(models.Model):
     user = models.ForeignKey(User, on_delete=models.CASCADE)
     photo = models.ForeignKey(Photo, on_delete=models.CASCADE)
     liked = models.BooleanField(default=False)
-    created_at = models.DateTimeField(auto_now_add=True)
+    created_at = models.DateTimeField(default=timezone.now)
     updated_at = models.DateTimeField(auto_now=True)
 
     class Meta:
