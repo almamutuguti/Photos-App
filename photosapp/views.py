@@ -1,7 +1,9 @@
 from django.shortcuts import render, get_object_or_404, redirect
-from django.views.generic import ListView, DetailView
-from django.contrib.auth.mixins import LoginRequiredMixin
-from .models import Photo, Tag, Like
+from django.contrib.auth.decorators import login_required
+from django.db.models import Q, Count
+from django.contrib import messages
+from .models import Photo, Tag, UserInteraction
+from .forms import ProfileUpdateForm, PhotoUploadForm
 
 
 # Create your views here.
@@ -9,46 +11,88 @@ from .models import Photo, Tag, Like
 def index(request):
     return render(request, 'index.html')
 
-class PhotoListView(ListView):
-    model = Photo
-    template_name = 'photos/photo_list.html'
-    context_object_name = 'photos'
-    paginate_by = 10
+def home(request):
+    photos = Photo.objects.all().select_related('uploaded_by').prefetch_related('tags')
+    tags = Tag.objects.annotate(photo_count=Count('photo')).order_by('-photo_count')[:10]
 
-    def get_queryset(self):
-        queryset = super().get_queryset().order_by('-uploaded_at')
-        tag_name = self.request.GET.get('tag')
-        if tag_name:
-            tag = get_object_or_404(Tag, name=tag_name)
-            queryset = queryset.filter(tags=tag)
-        return queryset
+    #get filter parameters
+    tag_filter = request.GET.get('tag')
+    if tag_filter:
+        photos = photos.filter(tags__name=tag_filter)
+    
+    context = {
+        'photos': photos,
+        'tags': tags,
+        'selected_tag': tag_filter,
+    }
 
-    def get_context_data(self, **kwargs):
-        context = super().get_context_data(**kwargs)
-        context['tags'] = Tag.objects.all()
-        return context
+    return render(request, 'home.html', context)
 
-class PhotoDetailView(DetailView):
-    model = Photo
-    template_name = 'photos/photo_detail.html'
-    context_object_name = 'photo'
+def photo_detail(request, pk):
+    photo = get_object_or_404(Photo, pk=pk)
+    user_interaction = None
+    
 
-    def get_context_data(self, **kwargs):
-        context = super().get_context_data(**kwargs)
-        photo = self.get_object()
-        if self.request.user.is_authenticated:
-            context['user_has_liked'] = Like.objects.filter(photo=photo, user=self.request.user).exists()
-        return context
+    if request.user.is_authenticated:
+        user_interaction, created = UserInteraction.objects.get_or_create(
+            user=request.user,
+            photo=photo
+        )
+
+    context = {
+        'photo': photo,
+        'user_interaction': user_interaction,
+    }
+    return render(request, 'photo_detail.html', context)
 
 @login_required
-def like_photo(request, pk):
-    photo = get_object_or_404(Photo, pk=pk)
-    if not Like.objects.filter(photo=photo, user=request.user).exists():
-        Like.objects.create(photo=photo, user=request.user)
-    return redirect('photo_detail', pk=pk)
+def upload_photo(request):
+    if request.method == 'POST':
+        form = PhotoUploadForm(request.POST, request.FILES)
+        if form.is_valid():
+            photo = form.save(commit=False)
+            photo.uploaded_by = request.user
+            photo.save()
+            
+            # Process tags
+            tags_input = form.cleaned_data['tags']
+            if tags_input:
+                tags = [tag.strip() for tag in tags_input.split(',')]
+                for tag_name in tags:
+                    tag, created = Tag.objects.get_or_create(name=tag_name.lower())
+                    photo.tags.add(tag)
+            
+            messages.success(request, 'Photo uploaded successfully!')
+            return redirect('photo_detail', pk=photo.pk)
+    else:
+        form = PhotoUploadForm()
+    
+    return render(request, 'upload_photo.html', {'form': form})
 
 @login_required
-def unlike_photo(request, pk):
-    photo = get_object_or_404(Photo, pk=pk)
-    Like.objects.filter(photo=photo, user=request.user).delete()
-    return redirect('photo_detail', pk=pk)
+def profile(request):
+    if request.method == 'POST':
+        form = ProfileUpdateForm(
+            request.POST, 
+            request.FILES, 
+            instance=request.user.profile
+        )
+        if form.is_valid():
+            form.save()
+            messages.success(request, 'Profile updated successfully!')
+            return redirect('profile')
+    else:
+        form = ProfileUpdateForm(instance=request.user.profile)
+    
+    user_photos = Photo.objects.filter(uploaded_by=request.user)
+    liked_photos = Photo.objects.filter(
+        userinteraction__user=request.user,
+        userinteraction__liked=True
+    )
+    
+    context = {
+        'form': form,
+        'user_photos': user_photos,
+        'liked_photos': liked_photos,
+    }
+    return render(request, 'profile.html', context)

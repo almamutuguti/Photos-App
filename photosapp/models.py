@@ -45,3 +45,17 @@ class Photo(models.Model):
 
     def __str__(self):
         return self.title
+    
+
+class UserInteraction(models.Model):
+    user = models.ForeignKey(User, on_delete=models.CASCADE)
+    photo = models.ForeignKey(Photo, on_delete=models.CASCADE)
+    liked = models.BooleanField(default=False)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        unique_together = ['user', 'photo']
+
+    def __str__(self):
+        return f"{self.user.username} - {self.photo.title} - {'Liked' if self.liked else 'Not liked'}"
