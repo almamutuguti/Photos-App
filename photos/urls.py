@@ -19,6 +19,8 @@ from django.urls import include, path
 from django.contrib.auth import views 
 from django.conf.urls import handler404, handler500
 from django_registration.backends.one_step.views import RegistrationView
+from django.conf import settings
+from django.conf.urls.static import static
 
 urlpatterns = [
     path('admin/', admin.site.urls),
@@ -28,5 +30,8 @@ urlpatterns = [
     path('accounts/', include('django.contrib.auth.urls')),
     
 
-]
+] 
+
+if settings.DEBUG:
+    urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
 
